@@ -1,5 +1,5 @@
 [dependency-groups]
-shared = ["mcp"]
+shared = ["fastmcp", "mcp[cli]"]
 dev = ["pytest>=8.3.5", "aiosqlite>=0.21.0"]
 test = [
   "hypothesis>=6.130.2",

@@ -12,5 +12,5 @@ service_run service_name *ARGS:
   uv run --project=services/{{ service_name }} {{ ARGS }}
 
 # ex: just prompt_server.py
-microsoft_mcp file_name *ARGS:
-  uv --directory=services/microsoft_mcp run {{ file_name }} {{ ARGS }}
+research_mcp file_name *ARGS:
+  uv --directory=services/research_mcp run {{ file_name }} {{ ARGS }}

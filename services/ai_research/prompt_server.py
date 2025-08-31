@@ -1,7 +1,7 @@
 import json
 import logging
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from typing import Literal
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -15,7 +15,8 @@ mcp = FastMCP("prompt demo server")
 TLevels = Literal["begginer", "intermediate", "advanced"]
 
 
-# ========================================================================================== PROMPT
+# ==========================================================================================
+# PROMPTS - pre-written templtes that help users accomplish specific stasks
 
 
 @mcp.prompt()
@@ -33,25 +34,52 @@ def python_topics(level: TLevels = "begginer") -> str:
     return prompt
 
 
-# ========================================================================================== TOOLS
+# ==========================================================================================
+# TOOLS - tools that help users accomplish specific tasks
 
 
 @dataclass
-class Exersice:
+class Exercise:
     title: str
-    desc: str
+    description: str
     hint: str
     solution: str
     story_point: int
 
 
-exercises_db: dict[str, list[Exersice]] = {}
+exercises_db = {
+    "beginner": [
+        Exercise(
+            title="Hello World",
+            description="Write a program that prints 'Hello, Python!' to the console",
+            hint="Try using print()",
+            solution="print('Hello, World!')",
+            story_point=1,
+        )
+    ],
+    "intermediate": [
+        Exercise(
+            title="List Comprehension",
+            description="Create a list of squares for numbers 1-10 using list comprehension",
+            hint="Use the syntax: [expression for item in range()]",
+            solution="squares = [x**2 for x in range(1, 11)]\nprint(squares)",
+            story_point=3,
+        )
+    ],
+    "advanced": [
+        Exercise(
+            title="Decorator Pattern",
+            description="Create a decorator that times how long a function takes to run",
+            hint="Use time.time() before and after the function call",
+            solution="import time\nfrom functools import wraps\n\ndef timer(func):\n    @wraps(func)\n    def wrapper(*args, **kwargs):\n        start = time.time()\n        result = func(*args, **kwargs)\n        end = time.time()\n        print(f'{func.__name__} took {end-start:.4f} seconds')\n        return result\n    return wrapper",
+            story_point=5,
+        )
+    ],
+}
 
 
 @mcp.prompt()
 async def generate_exersice(topic: str, level: str = "begginer") -> str:
-    """Generate Python exersice"""
-
     return f"Generate Python exersice on topic: {topic} for level: {level}"
 
 
@@ -72,9 +100,9 @@ async def generrate_and_create_excersices(
         exercises_db[level] = []
         for ex in exercises_data[level]:
             exercises_db[level].append(
-                Exersice(
+                Exercise(
                     title=ex["title"],
-                    desc=ex["desc"],
+                    description=ex["desc"],
                     hint=ex["hint"],
                     solution=ex["solution"],
                     story_point=ex["story_point"],
@@ -98,7 +126,7 @@ async def list_exercises() -> str:
         result.append(f"Level: {level.upper()}")
         for i, exercise in enumerate(exercises, 1):
             result.append(f"Title: {i + 1}.{exercise.title}")
-            result.append(f"Description: {exercise.desc}")
+            result.append(f"Description: {exercise.description}")
             result.append(f"Hint: {exercise.hint}")
             result.append(f"Solution: {exercise.solution}")
             result.append(f"Story point: {exercise.story_point}/5")
@@ -107,7 +135,8 @@ async def list_exercises() -> str:
     return "\n".join(result)
 
 
-# ========================================================================================== RESOUCES
+# ==========================================================================================
+# RESOUCES - tools that help users accomplish specific tasks
 
 study_progress_file = os.path.join(os.path.dirname(__file__), "study_progress.json")
 beginner_exercises_file = os.path.join(os.path.dirname(__file__), "beginner_exercises.json")
