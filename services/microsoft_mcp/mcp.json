@@ -1,0 +1,14 @@
+{
+  "inputs": [],
+  "servers": {
+    "microsoft_mcp_learning": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        ".",
+        "run",
+        "prompt_server.py"
+      ]
+    }
+  }
+}
