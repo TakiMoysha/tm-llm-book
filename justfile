@@ -14,3 +14,6 @@ service_run service_name *ARGS:
 # ex: just prompt_server.py
 research_mcp file_name *ARGS:
   uv --directory=services/research_mcp run {{ file_name }} {{ ARGS }}
+
+simple_rag file_name *ARGS:
+  uv --directory=services/simple_rag run {{ file_name }} {{ ARGS }}
