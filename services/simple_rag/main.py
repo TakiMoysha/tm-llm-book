@@ -30,7 +30,7 @@ class LMStudioLLM(LLM):
         return "custom"
 
 
-llm = lmStudioLLM()
+llm = LMStudioLLM()
 # ==========================================================================================
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 LANGUAGE_MODEL = ""
@@ -66,18 +66,22 @@ def ask_question(question: str):
         print(doc.metadata["source"], doc.page_content)
 
 
-def run_cli(vault: str):
-    # vault_processing(args.vault)
-    pass
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    operation_parser = parser.add_subparsers(dest="operations", help="Available operations")
 
-    parser.add_argument("--vault", type=str, help="path to documents vault", required=True)
+    parser_process = operation_parser.add_parser("vault_processing", help="Embed documents from vault")
+    parser_process.add_argument("--vault", type=str, help="path to documents vault", required=True)
 
-    parser.add_argument_group("operation")
+    parser_ask = operation_parser.add_parser("ask", help="Ask a question")
+
 
     args = parser.parse_args()
 
-    run_cli(args.vault)
+    if args.command == "vault_processing":
+        vault_processing(Path(args.vault))
+    elif args.command == "ask_question":
+        ask_question(args.question)
+    else:
+        parser.print_help()
+
