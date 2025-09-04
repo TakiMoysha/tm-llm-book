@@ -1,7 +1,34 @@
+[project]
+name = "langchain-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "ipython>=9.5.0",
+  "langchain>=0.3.27",
+  "langchain-community>=0.3.29",
+  "langgraph>=0.6.6",
+  "llama-cpp-python>=0.3.16",
+  #
+  "gradio>=5.44.1",
+  #
+  "httpx>=0.28.1",
+  "langchain>=0.3.27",
+  "qdrant-client>=1.15.1",
+  "sentence-transformers>=5.1.0",
+  #
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [dependency-groups]
 shared = ["fastmcp", "mcp[cli]"]
-dev = ["pytest>=8.3.5", "aiosqlite>=0.21.0"]
+dev = ["aiosqlite>=0.21", "httpx>=0.28"]
 test = [
+  "pytest>=8.3",
   "hypothesis>=6.130.2",
   "httpx>=0.28.1",
   "coverage",

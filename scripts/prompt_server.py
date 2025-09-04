@@ -10,6 +10,10 @@ from mcp.types import SamplingMessage, TextContent
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
+MCP_JSON = {
+    "inputs": [],
+    "servers": {"microsoft_mcp_learning": {"command": "uv", "args": ["--directory", ".", "run", "prompt_server.py"]}},
+}
 mcp = FastMCP("prompt demo server")
 
 TLevels = Literal["begginer", "intermediate", "advanced"]
