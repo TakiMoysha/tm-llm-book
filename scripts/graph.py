@@ -40,5 +40,5 @@ graph = builder.compile()
 img = Image(graph.get_graph().draw_mermaid_png())
 
 with tempfile.NamedTemporaryFile() as f:
-    f.write(img.data) # type: ignore
+    f.write(img.data)  # type: ignore
     subprocess.run(["xdg-open", f.name], check=True)

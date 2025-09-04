@@ -18,6 +18,8 @@ dependencies = [
   "qdrant-client>=1.15.1",
   "sentence-transformers>=5.1.0",
   #
+  "asyncio>=4.0.0",
+  "anyio>=4.9.0",
 ]
 
 [build-system]
