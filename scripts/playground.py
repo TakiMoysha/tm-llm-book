@@ -1,16 +1,15 @@
 import logging
 import os
-from pathlib import Path
 
 import pytest
 from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import SecretStr
-
-from qdrant_client.http.models import VectorParams
+from qdrant_client.grpc import VectorParams
 from qdrant_client.models import Distance
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
@@ -80,9 +79,10 @@ def summary_of_web_page():
 
 
 EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5"
+EMBEDDING_MODEL_DIMENSIONS = 768
 
 
-def prepare_rag_document():
+def prepare_rag_documents():
     rag_doc = UnstructuredMarkdownLoader("./ork_speech.rag.ignore.md", mode="elements").load()
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
     split_rag_document = text_splitter.split_documents(rag_doc)
@@ -93,7 +93,7 @@ def prepare_rag_document():
 
 
 def get_roleplay_char_pipeline(llm: ChatOpenAI):
-    document = prepare_rag_document()
+    document = prepare_rag_documents()
     pass
 
 
@@ -102,42 +102,48 @@ from langchain.chains import RetrievalQA
 
 @pytest.mark.target
 def test_embedding_text():
-    document = prepare_rag_document()
+    documents = prepare_rag_documents()
     # check_embedding_ctx_length=False - required for LMStudio
     embeddings = OpenAIEmbeddings(base_url=OPENAI_LOCAL_URL, check_embedding_ctx_length=False)
     # vectorestores, working with OpenAI api
     vs = get_vectorestore(embedding=embeddings)
-    vs._embeddings = embeddings
-    docsearch = vs.from_documents(document, embeddings)
-    # retrieval engine
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=docsearch.as_retriever(),
-        embeddings=embeddings,
+    docsearch = QdrantVectorStore.from_documents(
+        documents,
+        embeddings,
+        location=":memory:",
     )
-    print(qa)
+    # retrieval engine
+    # qa = RetrievalQA.from_chain_type(
+    #     llm=llm,
+    #     chain_type="stuff",
+    #     retriever=docsearch.as_retriever(),
+    #     embeddings=embeddings,
+    # )
+    print(vs)
 
 
 # ==========================================================================================
 from qdrant_client import QdrantClient
-from langchain_qdrant import QdrantVectorStore
+from qdrant_client.conversions import common_types as types
 
 
-def get_vectorestore(*, embedding=None):
+def get_vectorestore(*, embedding: OpenAIEmbeddings | None = None):
     client = QdrantClient(":memory:")
     client.create_collection(
-        collection_name="ork_speech",
-        vectors_config=VectorParams(
-            size=1536,
-            distance=Distance.COSINE,
-        ),
+        collection_name="ork_speech_embeddings",
+        vectors_config=types.VectorParams(size=EMBEDDING_MODEL_DIMENSIONS, distance=Distance.COSINE),
     )
     return QdrantVectorStore(
         client=client,
-        collection_name="ork_speech",
+        collection_name="ork_speech_embeddings",
         embedding=embedding,
     )
+
+
+@pytest.mark.integration
+def test_vectorstore():
+    embeddings = OpenAIEmbeddings(base_url=OPENAI_LOCAL_URL, check_embedding_ctx_length=False)
+    vs = get_vectorestore(embedding=embeddings)
 
 
 # ==========================================================================================
