@@ -4,6 +4,6 @@ set dotenv-load
 run filename *ARGS:
   uv run {{ filename }} {{ ARGS }}
 
-[doc("")]
+[doc("ex: just test scripts/playground.py -m target")]
 test target *ARGS:
-    uv run pytest --verbose --capture=no {{ ARGS }} {{ target }}
+    uv run pytest --disable-warnings --verbose --capture=no {{ ARGS }} {{ target }}

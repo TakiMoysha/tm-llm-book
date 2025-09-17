@@ -10,6 +10,7 @@ dependencies = [
   "langchain-community>=0.3.29",
   "langchain-openai>=0.3.33",
   "langgraph>=0.6.6",
+  "unstructured>=0.18.15",
   "llama-cpp-python>=0.3.16",
   #
   "gradio>=5.44.1",
@@ -21,6 +22,9 @@ dependencies = [
   "asyncio>=4.0.0",
   "anyio>=4.9.0",
   "textblob>=0.19.0",
+  "markdown>=3.9",
+  "lmstudio>=1.5.0",
+  "langchain-qdrant>=0.2.1",
 ]
 
 [build-system]
@@ -48,6 +52,9 @@ test = [
   "tabulate>=0.9.0",
 ]
 
+[tool.uv]
+default-groups = "all"
+
 [tool.uv.workspace]
 members = ["libs/*", "services/*", "mcp-server"]
 
@@ -55,6 +62,9 @@ members = ["libs/*", "services/*", "mcp-server"]
 line-length = 120
 fix = true
 lint.fixable = ["ALL"]
+lint.ignore = [
+  "E402",
+]
 src = ["libs/**/*", "services/**/*"]
 target-version = "py312"
 extend-exclude = ["**/migrations"]

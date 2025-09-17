@@ -13,10 +13,10 @@ logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 @pytest.fixture(autouse=True)
 def vault_path() -> Path:
-    _vault_path = os.getenv("VAUL_PATH", None)
+    _vault_path = os.getenv("VAULT_PATH", None)
 
     if _vault_path is None or not os.path.exists(_vault_path):
-        raise Exception(f"VAUL_PATH is inavlid: {_vault_path}")
+        raise Exception(f"VAULT_PATH is inavlid: {_vault_path}")
 
     return Path(_vault_path)
 
@@ -62,8 +62,8 @@ def test_should_load_none(edge_yaml: str):
     may_be_none = yaml.safe_load(edge_yaml)
     assert any([x for x in may_be_none if x is None]), f"yaml is contain a None: {may_be_none}"
 
+
 def test_obsidian_vault_load(vault_path: Path):
     loader = ObsidianLoader(vault_path)
     vault = loader.load()
     assert True
-

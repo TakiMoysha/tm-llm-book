@@ -1,9 +1,21 @@
-import pytest
+import logging
 import os
+from pathlib import Path
 
-from langchain_openai import OpenAI, ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+import pytest
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import SecretStr
+
+from qdrant_client.http.models import VectorParams
+from qdrant_client.models import Distance
+
+logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+
+OPENAI_LOCAL_URL = "http://127.0.0.1:1234/v1/"
 
 
 class UseCase:
@@ -14,7 +26,7 @@ class UCChatSummarize(UseCase):
     llm: ChatOpenAI
     prompt_template = """
     %INSTRUCTIONS:
-    Please summarize the followind piece of text.
+    Please summarize the following piece of text.
     Respond in a manner that a 5 year old would understand.
 
     %TEXT:
@@ -53,6 +65,81 @@ def summarize(llm):
     print(f"{len(input)} -> {len(result.content)}")
 
 
+def summary_of_web_page():
+    uc = UCChatSummarize(llm)
+    input = uc.prompt.format(user_input="")
+    result = uc.llm.invoke(input)
+
+    print(result)
+
+
+# ==========================================================================================
+# make language kernel, up to 2000 tokens (1500 words);
+# RAG for rare and special cases;
+# pipeline for startup;
+
+
+EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5"
+
+
+def prepare_rag_document():
+    rag_doc = UnstructuredMarkdownLoader("./ork_speech.rag.ignore.md", mode="elements").load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
+    split_rag_document = text_splitter.split_documents(rag_doc)
+    num_total_characters = sum([len(x.page_content) for x in split_rag_document])
+    logging.debug(f"D.{len(split_rag_document)}: avr. {num_total_characters / len(split_rag_document):,.0f} chars.")
+    logging.debug(f"Total: {num_total_characters:,} chars")
+    return split_rag_document
+
+
+def get_roleplay_char_pipeline(llm: ChatOpenAI):
+    document = prepare_rag_document()
+    pass
+
+
+from langchain.chains import RetrievalQA
+
+
+@pytest.mark.target
+def test_embedding_text():
+    document = prepare_rag_document()
+    # check_embedding_ctx_length=False - required for LMStudio
+    embeddings = OpenAIEmbeddings(base_url=OPENAI_LOCAL_URL, check_embedding_ctx_length=False)
+    # vectorestores, working with OpenAI api
+    vs = get_vectorestore(embedding=embeddings)
+    vs._embeddings = embeddings
+    docsearch = vs.from_documents(document, embeddings)
+    # retrieval engine
+    qa = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=docsearch.as_retriever(),
+        embeddings=embeddings,
+    )
+    print(qa)
+
+
+# ==========================================================================================
+from qdrant_client import QdrantClient
+from langchain_qdrant import QdrantVectorStore
+
+
+def get_vectorestore(*, embedding=None):
+    client = QdrantClient(":memory:")
+    client.create_collection(
+        collection_name="ork_speech",
+        vectors_config=VectorParams(
+            size=1536,
+            distance=Distance.COSINE,
+        ),
+    )
+    return QdrantVectorStore(
+        client=client,
+        collection_name="ork_speech",
+        embedding=embedding,
+    )
+
+
 # ==========================================================================================
 
 pytestmark = pytest.mark.asyncio
@@ -66,16 +153,18 @@ def openai_api_key():
     return SecretStr(key)
 
 
-@pytest.fixture(autouse=True)
-def llm(openai_api_key):
-    return ChatOpenAI(
+@pytest.fixture
+def llm(openai_api_key) -> ChatOpenAI:
+    llm = ChatOpenAI(
         temperature=0.8,
         api_key=openai_api_key,
         max_retries=3,
         base_url="https://api.poe.com/v1",
         model="Assistant",
     )
+    return llm
 
 
-async def test_summarize(llm):
+async def test_summarize(llm: ChatOpenAI):
+    llm.temperature = 0
     summarize(llm)

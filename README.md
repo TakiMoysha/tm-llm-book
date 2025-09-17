@@ -2,6 +2,9 @@
 
 ## LangChain
 
+**LLM Adapters** - `langchain.llms.OpenAI`, `langchain.llms.HuggingFaceHub`, и т.д. Это адаптеры, которые отвечают за обрабатывание http запросов к API, сериализацию/десериализацию, управлением параметрами (температура, токены и т.д.).
+Адаптеры не зависят от архитектуры модели, а только от API интерфеса.
+
 ### Conceptions
 
 **Chat Messages**:
@@ -299,6 +302,10 @@ toolkit = load_tools(["serpapi"], llm=llm, serpapi_api_key=serpapi_api_key)
 agent = initialize_agent(toolkit, llm, agent="zero-shot-react-description", verbose=True, return_intermediate_steps=True)
 response = agent({"input":"what was the first album of the band that Natalie Bergman is a part of?"})
 ```
+
+### Using Documents As Context
+
+
 
 ## Infrastructure
 
