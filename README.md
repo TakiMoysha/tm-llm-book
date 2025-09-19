@@ -9,7 +9,7 @@
 
 **Chat Messages**:
 System - Helpful background context that tell the AI what to do
-Human - Messages that are intented to represent the user
+Human - Messages that are intended to represent the user
 AI - Messages that show what the AI responded with
 
 ```python
@@ -158,7 +158,7 @@ texts = text_splitter.split_documents(documents)
 # Get embedding engine ready
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
-# Embedd your texts
+# Embed your texts
 db = FAISS.from_documents(texts, embeddings)
 # Init your retriever. Asking for just 1 document back
 retriever = db.as_retriever()
@@ -286,7 +286,7 @@ chain.run(texts)
 
 > [!note] вместо агентов рекомендуется использовать langgraph.
 
-**Tools** - 'возможности' агентов. Это абстракция поверх фц-ий которые упрощают для LLMs (и agents) взаимодействие с другими инструментами (напримре google searh).
+**Tools** - 'возможности' агентов. Это абстракция поверх фц-ий которые упрощают для LLMs (и agents) взаимодействие с другими инструментами (напримре google search).
 
 **Toolkit** - коллекция инструментов.
 
