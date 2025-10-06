@@ -89,7 +89,7 @@ from langchain.chains.retrieval_qa.base import RetrievalQA
 
 
 def prepare_rag_documents() -> list[Document]:
-    rag_doc = UnstructuredMarkdownLoader("./ork_speech.rag.ignore.md", mode="elements").load()
+    rag_doc = UnstructuredMarkdownLoader("./data/ork_speech.rag.ignore.md", mode="elements").load()
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
     split_rag_document = text_splitter.split_documents(rag_doc)
     num_total_characters = sum([len(x.page_content) for x in split_rag_document])

@@ -326,6 +326,31 @@ LangSmith помогает с этим:
 
 - model.com
 
+# Templates
+
+## Design Document for \<PROJECT\>
+
+Structure:
+
+```
+Introduction (golas of document, terms, how data will flow through the system, etc.)
+System Overview
+- High level Description ()
+- Technology Stack ()
+Technical Approach
+- Tools (what tools will be used)
+System Architecture
+- High level Architecture (how data will flow through the system, focus on architecture, not implementation)
+- Deployment (how will the system be deployed)
+- SubSystem Design (how divided up is the system and what include in each subsystem)
+Class Diagrams (by subsystems)
+- Schedule Subsystem Diagrams (uml for subsystems)
+- Application Flow (how data through the system, where tools are used, ...)
+Sequence Diagram (by subsystems)
+```
+
+
+
 ## References
 
 1. [MCPLearn / github.com](https://github.com/microsoft/lets-learn-mcp-python#quick-start0)
