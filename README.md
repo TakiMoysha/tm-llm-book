@@ -330,7 +330,7 @@ LangSmith помогает с этим:
 
 ## Design Document for \<PROJECT\>
 
-Structure:
+### Simple First
 
 ```
 Introduction (golas of document, terms, how data will flow through the system, etc.)
@@ -349,7 +349,26 @@ Class Diagrams (by subsystems)
 Sequence Diagram (by subsystems)
 ```
 
+### Simple Second
 
+```
+Introduction
+- Purpose (application goal, what include in design document)
+- Scope (major components of application)
+- References
+
+System Overview
+
+System Components
+- Descomposition Description
+- Dependency Description
+- Interface Description
+- UX/UI 
+
+Detailed Design
+- Module Detailed Design
+- Data Detailed Design
+```
 
 ## References
 
