@@ -4,7 +4,7 @@ from pathlib import Path
 MODEL_PATH = Path(os.getenv("STOREDIR", "")) / "ai-models/osmosis-ai/osmosis-mcp-4b/osmosis-mcp-4B-Q4_K_S.gguf"
 
 if not MODEL_PATH.exists():
-    raise Exception(f"MODEL_PATH is inavlid: {MODEL_PATH}")
+    raise Exception(f"MODEL_PATH is invalid: {MODEL_PATH}")
 
 
 # ============================= Vector Stores ==============================

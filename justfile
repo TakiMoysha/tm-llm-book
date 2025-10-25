@@ -1,5 +1,12 @@
 set dotenv-load
 
+OPENAI_URL := "http://127.0.0.1:1234/v1/"
+LLM_MODEL := "mistralai/mistral-nemo-instruct-2407"
+EMBEDDING_MODEL := "text-embedding-nomic-embed-text-v1.5"
+EMBEDDING_MODEL_DIMENSIONS := "768"
+
+
+
 [doc("")]
 run filename *ARGS:
   uv run {{ filename }} {{ ARGS }}

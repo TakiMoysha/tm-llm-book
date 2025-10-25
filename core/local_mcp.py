@@ -1,10 +1,6 @@
 import json
 import gradio as gr
 from textblob import TextBlob
-import scripts.lib
-
-fs = scripts.lib.FS()
-
 
 def sentiment_analysis(text: str) -> str:
     blob = TextBlob(text)

@@ -16,7 +16,7 @@ def vault_path() -> Path:
     _vault_path = os.getenv("VAULT_PATH", None)
 
     if _vault_path is None or not os.path.exists(_vault_path):
-        raise Exception(f"VAULT_PATH is inavlid: {_vault_path}")
+        raise Exception(f"VAULT_PATH is invalid: {_vault_path}")
 
     return Path(_vault_path)
 
