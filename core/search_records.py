@@ -55,6 +55,11 @@ def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> 
             collection_name=QDRANT_COLLECTION,
             vectors_config=types.VectorParams(size=embedding_dimensions, distance=Distance.COSINE),
         )
+    client.create_payload_index(
+        collection_name=QDRANT_COLLECTION,
+        field_name="manufacturer",
+        field_schema=PayloadSchemaType.TEXT,
+    )
     return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding)
 
 
@@ -69,7 +74,7 @@ date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 import lmstudio as lms
 from qdrant_client.conversions import common_types as types
-from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PayloadSchemaType, PointStruct
 
 
 def sql_to_qdrant_point(sql_record) -> PointStruct:
@@ -151,14 +156,14 @@ def main():
     vs_client = get_qdrant_client()
     embedding_model = get_lms_embedding_model()
     vs = get_vectorestore(embedding_model, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
-    # database_upload(vs, vs_client)
+    database_upload(vs, vs_client)
 
     # user_input = input("Text for search: ")
     user_input = "Dubious parenting advice"
     vector = embedding_model.embed_query(user_input)
-    res = vs.similarity_search_by_vector(vector, k=3)
+    res = vs.similarity_search_by_vector(vector, k=5)
     for r in res:
-        print(r)
+        print(r.page_content, r.metadata)
 
     def _sort_results(results, field_name, descending=False):
         return sorted(results, key=lambda x: x.payload.get(field_name, ""), reverse=descending)
@@ -177,14 +182,12 @@ def main():
         collection_name=QDRANT_COLLECTION,
         query=vector,
         query_filter=search_filter,
-        limit=3,
+        limit=5,
         with_payload=["product_name"],
     )
     sorted_res = _sort_results(res.points, "product_name", descending=False)
     for r in sorted_res:
         print(r)
-
-
 
 
 if __name__ == "__main__":
