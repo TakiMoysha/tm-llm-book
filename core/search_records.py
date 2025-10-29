@@ -12,9 +12,9 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client.qdrant_client import QdrantClient
 
-from .lib.env_config import EnvConfig
+from core.lib.env_config import EnvConfig
 
-logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
 
 
 CONFIG = EnvConfig()
@@ -69,7 +69,7 @@ date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 import lmstudio as lms
 from qdrant_client.conversions import common_types as types
-from qdrant_client.models import Distance, PointStruct
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct
 
 
 def sql_to_qdrant_point(sql_record) -> PointStruct:
@@ -89,7 +89,7 @@ def sql_to_qdrant_point(sql_record) -> PointStruct:
         raw_document = {
             "id": record[0],
             "summary": summary,
-            "embedding(vector)": summary_embedding,
+            "vector": summary_embedding,
             "product_name": record[1],
             "product_description": record[2],
             "technical_specs": record[3],
@@ -148,12 +148,47 @@ def database_upload(vs, client):
 
 
 def main():
-    client = get_qdrant_client()
-    embedding = get_lms_embedding_model()
-    vs = get_vectorestore(embedding, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    vs_client = get_qdrant_client()
+    embedding_model = get_lms_embedding_model()
+    vs = get_vectorestore(embedding_model, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    # database_upload(vs, vs_client)
 
-    database_upload(vs, client)
+    # user_input = input("Text for search: ")
+    user_input = "Dubious parenting advice"
+    vector = embedding_model.embed_query(user_input)
+    res = vs.similarity_search_by_vector(vector, k=3)
+    for r in res:
+        print(r)
 
+    def _sort_results(results, field_name, descending=False):
+        return sorted(results, key=lambda x: x.payload.get(field_name, ""), reverse=descending)
+
+    user_input = "tennis racket"
+    vector = embedding_model.embed_query(user_input)
+    search_filter = Filter(
+        must=[
+            FieldCondition(
+                key="manufacturer",
+                match=MatchValue(value="Banana Angel inc."),
+            )
+        ]
+    )
+    res = vs_client.query_points(
+        collection_name=QDRANT_COLLECTION,
+        query=vector,
+        query_filter=search_filter,
+        limit=3,
+        with_payload=["product_name"],
+    )
+    sorted_res = _sort_results(res.points, "product_name", descending=False)
+    for r in sorted_res:
+        print(r)
+
+
+
+
+if __name__ == "__main__":
+    main()
 
 # ===========================================================
 # tests
