@@ -58,9 +58,6 @@ test = [
 [tool.uv]
 default-groups = "all"
 
-[tool.uv.workspace]
-members = ["libs/*", "services/*", "mcp-server"]
-
 [tool.ruff]
 line-length = 120
 fix = true
