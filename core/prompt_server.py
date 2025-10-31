@@ -16,17 +16,17 @@ MCP_JSON = {
 }
 mcp = FastMCP("prompt demo server")
 
-TLevels = Literal["begginer", "intermediate", "advanced"]
+TLevels = Literal["beginner", "intermediate", "advanced"]
 
 
 # ==========================================================================================
-# PROMPTS - pre-written templtes that help users accomplish specific stasks
+# PROMPTS - pre-written templates that help users accomplish specific stasks
 
 
 @mcp.prompt()
-def python_topics(level: TLevels = "begginer") -> str:
+def python_topics(level: TLevels = "beginner") -> str:
     learning_levels = {
-        "begginer": "for someone who is learning python",
+        "beginner": "for someone who is learning python",
         "intermediate": "for someone with some python experience",
         "advanced": "for someone with python experience",
     }
@@ -83,18 +83,18 @@ exercises_db = {
 
 
 @mcp.prompt()
-async def generate_exersice(topic: str, level: str = "begginer") -> str:
-    return f"Generate Python exersice on topic: {topic} for level: {level}"
+async def generate_exercise(topic: str, level: str = "beginner") -> str:
+    return f"Generate Python exercise on topic: {topic} for level: {level}"
 
 
 @mcp.tool()
 async def generrate_and_create_excersices(
     topic: str,
-    level: str = "begginer",
+    level: str = "beginner",
     ctx: Context | None = None,
 ) -> str:
     try:
-        prompt_text = await generate_exersice(topic, level)
+        prompt_text = await generate_exercise(topic, level)
         response = await ctx.session.create_message(
             messages=[SamplingMessage(role="user", content=TextContent(type="text", text=prompt_text))], max_tokens=2000
         )
@@ -113,11 +113,11 @@ async def generrate_and_create_excersices(
                 )
             )
 
-        return f"Successfully generated {len(exercises_data[level])} exersices for topic: {topic} and level: {level}"
+        return f"Successfully generated {len(exercises_data[level])} exercises for topic: {topic} and level: {level}"
     except json.JSONDecodeError as err:
         return f"JSONDecodeError: {err}"
     except Exception as err:
-        return f"Failed to generate exersices for topic: {topic} and level: {level}: {err}"
+        return f"Failed to generate exercises for topic: {topic} and level: {level}: {err}"
 
 
 @mcp.tool()
@@ -140,7 +140,7 @@ async def list_exercises() -> str:
 
 
 # ==========================================================================================
-# RESOUCES - tools that help users accomplish specific tasks
+# RESOURCES - tools that help users accomplish specific tasks
 
 study_progress_file = os.path.join(os.path.dirname(__file__), "study_progress.json")
 beginner_exercises_file = os.path.join(os.path.dirname(__file__), "beginner_exercises.json")
@@ -168,7 +168,7 @@ async def get_study_progress(username: str) -> str:
 @mcp.resource("user://exercises/{level}")
 async def list_exercises_for_level(level: str) -> str:
     try:
-        if level != "begginer":
+        if level != "beginner":
             return json.dumps({"error": f"no exercises for level: {level}"})
 
         with open(beginner_exercises_file, "r") as f:

@@ -7,11 +7,13 @@ import sqlite3
 from functools import lru_cache
 from pathlib import Path
 from typing import Generator
+import progressbar
 
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
+import qdrant_client
+import qdrant_client.http.exceptions
 from qdrant_client.qdrant_client import QdrantClient
-
 from core.lib.env_config import EnvConfig
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
@@ -50,11 +52,17 @@ def get_qdrant_client() -> QdrantClient:
 def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> QdrantVectorStore:
     client = get_qdrant_client()
     logging.debug(f"{embedding_dimensions=}")
-    if client.get_collection(collection_name=QDRANT_COLLECTION) is None:
+    try:
+        client.get_collection(collection_name=QDRANT_COLLECTION)
+    except qdrant_client.http.exceptions.UnexpectedResponse as err:
+        if err.status_code != 404:
+            raise err
+
         client.create_collection(
             collection_name=QDRANT_COLLECTION,
             vectors_config=types.VectorParams(size=embedding_dimensions, distance=Distance.COSINE),
         )
+
     client.create_payload_index(
         collection_name=QDRANT_COLLECTION,
         field_name="manufacturer",
@@ -133,21 +141,26 @@ def db_iterator(batch_size: int = 100) -> Generator:
             logging.info(f"{total_records_transformed=}")
 
 
+
 def database_upload(vs, client):
     _DELETE_MARK = -1
+    _BATCH_SIZE = 200
 
-    for batch in db_iterator(batch_size=100):
+    for batch in db_iterator(batch_size=_BATCH_SIZE):
         points: list[PointStruct] = []
-        for record in batch:
-            if record[_DELETE_MARK]:
-                try:
-                    vs.delete(documents=[{"id": str(record[0])}])
-                except Exception:
+
+        with progressbar.ProgressBar(maxval=len(batch), redirect_stdout=True) as bar:
+            for record in batch:
+                if record[_DELETE_MARK]:
+                    try:
+                        vs.delete(documents=[{"id": str(record[0])}])
+                    except Exception:
+                        points.append(sql_to_qdrant_point(record))
+                    continue
+                else:
+                    bar.increment()
+                    # bar = bar(f"Summarizing record with ID {record[0]}")
                     points.append(sql_to_qdrant_point(record))
-                continue
-            else:
-                print(f"Summarizing record with ID {record[0]}")
-                points.append(sql_to_qdrant_point(record))
 
         client.upsert(QDRANT_COLLECTION, points)
 

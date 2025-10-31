@@ -3,3 +3,8 @@ services:
     image: qdrant/qdrant:latest
     ports:
       - 6333:6333
+    volume: 
+      - qdrant-data:/qdrant/storage
+
+volume:
+  qdrant-data:

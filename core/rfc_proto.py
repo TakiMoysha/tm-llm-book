@@ -11,13 +11,57 @@
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
+import subprocess
 
 # ===========================================================
 # Prepare
 # ===========================================================
 """
 On this stage we download the RFC's and put them into a database as embeddings for further processing.
+
+1. Download bank of RFC's
+2. Upsert each RFC into the database
+3. 
+
 """
+
+
+if (OUTPUT_DIR := Path("./data/")) and not OUTPUT_DIR.exists():
+    raise Exception(f"Output directory does not exist (or wrong workdir): {OUTPUT_DIR.absolute()}")
+
+
+def download_rfc(rfc_id: int) -> Path:
+    """Download RFC and save it to the output directory
+
+    Args:
+        rfc_id (int): RFC ID
+
+    Returns:
+        Path: Path to the downloaded RFC
+    """
+    rsync_url = f"rsync.rfc-editor.org::rfcs-text-only/rfc{rfc_id}.txt"
+    local_file = OUTPUT_DIR / f"rfc{rfc_id}.txt"
+
+    try:
+        result = subprocess.run(
+            ["rsync", "-avz", rsync_url, str(local_file)], check=True, capture_output=True, text=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise Exception("Cannot download RFC.") from e
+
+    if result.returncode != 0:
+        raise Exception(f"Download failed: {result.stderr}")
+
+    return local_file
+
+
+def test_download_rfc():
+    path = download_rfc(8259)
+    assert path.exists()
+
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 # ===========================================================
@@ -134,27 +178,29 @@ llm: ChatOpenAI = ChatOpenAI(
 )
 
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            "Answer short, precise and added source references as possible, source format: 'RFC XXXX, Section N.'",
-        ),
-        ("user", "Question: {input}"),
-        ("user", "Context: {context}"),
-    ]
-)
+def _():
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "Answer short, precise and added source references as possible, source format: 'RFC XXXX, Section N.'",
+            ),
+            ("user", "Question: {input}"),
+            ("user", "Context: {context}"),
+        ]
+    )
 
-# chain
-rag_chain = prompt | llm | StrOutputParser()
+    # chain
+    rag_chain = prompt | llm | StrOutputParser()
 
-#
-response = rag_chain.invoke(
-    {
-        "input": "Can I write comments in JSON?",
-        "context": retrieved_docs,  # это metadata={"rfc": "8259", "section": "2"}
-    }
-)
+    #
+    response = rag_chain.invoke(
+        {
+            "input": "Can I write comments in JSON?",
+            # "context": retrieved_docs,  # это metadata={"rfc": "8259", "section": "2"}
+        }
+    )
+
 
 # ===========================================================
 # Code Testing
@@ -188,6 +234,7 @@ def _ServerConfig():
         pytest.fail("OPENAI_API_KEY is not set")
 
     return ServerConfig(url=_url, api_key=_api_key)
+
 
 @pytest.mark.fixture(name="LLMConfig", autouse=True)
 def _LLMConfig():

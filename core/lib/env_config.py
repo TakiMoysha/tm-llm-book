@@ -10,7 +10,7 @@ class EnvConfig:
     EMBEDDING_MODEL_DIMENSIONS: int = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL_DIMENSIONS"))
 
     OPENAI_API_KEY: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY"), repr=False)
-    VAULT_PATH: str = field(default_factory=lambda: os.getenv("VAULT_PATH"))
+    VAULT_PATH: str = field(default_factory=lambda: os.getenv("OBSIDIAN_VAULT_PATH"))
 
     QDRANT_URL: str = field(default_factory=lambda: os.getenv("QDRANT_URL", ":memory:"))
 
