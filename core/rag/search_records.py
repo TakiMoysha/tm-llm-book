@@ -7,7 +7,7 @@ import sqlite3
 from functools import lru_cache
 from pathlib import Path
 from typing import Generator
-import progressbar
+from tqdm import tqdm
 
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -49,7 +49,7 @@ def get_qdrant_client() -> QdrantClient:
     return QdrantClient(CONFIG.QDRANT_URL)
 
 
-def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> QdrantVectorStore:
+def get_vector_store(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> QdrantVectorStore:
     client = get_qdrant_client()
     logging.debug(f"{embedding_dimensions=}")
     try:
@@ -69,6 +69,9 @@ def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> 
         field_schema=PayloadSchemaType.TEXT,
     )
     return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding)
+
+
+class VectorStoreBuilder:
 
 
 from datetime import datetime
@@ -141,15 +144,14 @@ def db_iterator(batch_size: int = 100) -> Generator:
             logging.info(f"{total_records_transformed=}")
 
 
-
-def database_upload(vs, client):
+def upload_database_to_qdrant(vs, client):
     _DELETE_MARK = -1
-    _BATCH_SIZE = 200
+    _BATCH_SIZE = 100
 
-    for batch in db_iterator(batch_size=_BATCH_SIZE):
-        points: list[PointStruct] = []
+    with tqdm(total=None, desc="Uploading to Qdrant", unit="records") as bar:
+        for batch in db_iterator(batch_size=_BATCH_SIZE):
+            points: list[PointStruct] = []
 
-        with progressbar.ProgressBar(maxval=len(batch), redirect_stdout=True) as bar:
             for record in batch:
                 if record[_DELETE_MARK]:
                     try:
@@ -158,9 +160,11 @@ def database_upload(vs, client):
                         points.append(sql_to_qdrant_point(record))
                     continue
                 else:
-                    bar.increment()
                     # bar = bar(f"Summarizing record with ID {record[0]}")
                     points.append(sql_to_qdrant_point(record))
+
+                bar.update()
+                bar.set_postfix({"record_id": record[0], "product_name": record[1]})
 
         client.upsert(QDRANT_COLLECTION, points)
 
@@ -168,8 +172,9 @@ def database_upload(vs, client):
 def main():
     vs_client = get_qdrant_client()
     embedding_model = get_lms_embedding_model()
-    vs = get_vectorestore(embedding_model, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
-    database_upload(vs, vs_client)
+    vs = get_vector_store(embedding_model, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+
+    _ = upload_database_to_qdrant(vs, vs_client)
 
     # user_input = input("Text for search: ")
     user_input = "Dubious parenting advice"
@@ -218,8 +223,8 @@ def test_db_op_delete():
     op_delete()
 
 
-def test_vectorestore_with_embeddings():
-    vs = get_vectorestore(get_lms_embedding_model(), CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+def test_vector_store_with_embeddings():
+    vs = get_vector_store(get_lms_embedding_model(), CONFIG.EMBEDDING_MODEL_DIMENSIONS)
     vs.add_texts(["hello", "world"], ids=[1, 2])
     res = vs.search("hello", search_type="similarity", k=1)
     assert len(res) == 1
@@ -228,5 +233,5 @@ def test_vectorestore_with_embeddings():
 def test_database_upload():
     client = get_qdrant_client()
     embedding = get_lms_embedding_model()
-    vs = get_vectorestore(embedding, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
-    database_upload(vs, client)
+    vs = get_vector_store(embedding, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    upload_database_to_qdrant(vs, client)

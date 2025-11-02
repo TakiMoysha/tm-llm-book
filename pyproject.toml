@@ -29,6 +29,8 @@ dependencies = [
   "aioboto3>=15.4.0",
   "minio>=7.2.18",
   "progressbar2>=4.5.0",
+  "tqdm>=4.67.1",
+  "streamlit>=1.51.0",
 ]
 
 [build-system]

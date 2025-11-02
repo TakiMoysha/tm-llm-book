@@ -100,8 +100,8 @@ def prepare_rag_documents() -> list[Document]:
 
 def load_qa_chain_with_docs(llm: ChatOpenAI, documents: list[Document]):
     embeddings = get_lms_embedding_model()
-    # vectorestores, working with OpenAI api
-    vs = get_vectorestore(
+    # vector_stores, working with OpenAI api
+    vs = get_vector_store(
         embeddings,
         EMBEDDING_MODEL_DIMENSIONS,
     )
@@ -174,8 +174,8 @@ from langchain.evaluation.qa import QAEvalChain
 
 def load_qa_eval_chain_with_docs(llm: ChatOpenAI, documents: list[Document]):
     embeddings = get_lms_embedding_model()
-    # vectorestores, working with OpenAI api
-    vs = get_vectorestore(embeddings, EMBEDDING_MODEL_DIMENSIONS)
+    # vector_stores, working with OpenAI api
+    vs = get_vector_store(embeddings, EMBEDDING_MODEL_DIMENSIONS)
     docsearch = vs.from_documents(documents, embeddings, location=":memory:")
 
     return QAEvalChain.from_llm(
@@ -226,7 +226,7 @@ def get_lms_embedding_model():
     return OpenAIEmbeddings(base_url=OPENAI_LOCAL_URL, check_embedding_ctx_length=False)
 
 
-def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions):
+def get_vector_store(embedding: OpenAIEmbeddings, embedding_dimensions):
     client = QdrantClient(":memory:")
     client.create_collection(
         collection_name="ork_speech_embeddings",
@@ -245,7 +245,7 @@ def get_vectorestore(embedding: OpenAIEmbeddings, embedding_dimensions):
 @pytest.mark.integration
 def test_vectorstore_with_embeddings():
     embedding = get_lms_embedding_model()
-    vs = get_vectorestore(embedding, EMBEDDING_MODEL_DIMENSIONS)
+    vs = get_vector_store(embedding, EMBEDDING_MODEL_DIMENSIONS)
 
 
 # ==========================================================================================
