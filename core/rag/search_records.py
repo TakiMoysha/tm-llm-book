@@ -2,11 +2,12 @@
 # prepare & facilities
 # ===========================================================
 
+from dataclasses import dataclass
 import logging
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator, Protocol, runtime_checkable
 from tqdm import tqdm
 
 from langchain_openai import OpenAIEmbeddings
@@ -15,6 +16,7 @@ import qdrant_client
 import qdrant_client.http.exceptions
 from qdrant_client.qdrant_client import QdrantClient
 from core.lib.env_config import EnvConfig
+from core.rag.interfaces import ISearchRag
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
 
@@ -33,15 +35,24 @@ def op_delete():
         logging.debug(f"records: {records}")
 
 
+@dataclass
+class EmbeddingContext:
+    model: OpenAIEmbeddings
+    dimensions: int
+
+
 @lru_cache
-def get_lms_embedding_model():
+def get_lms_embedding_model_context() -> EmbeddingContext:
     embedding_model = lms.list_loaded_models("embedding")
     if embedding_model is None or len(embedding_model) == 0:
         embedding_model = lms.embedding_model(CONFIG.EMBEDDING_MODEL)
         logging.info(embedding_model)
 
     # check_embedding_ctx_length=False - required for LMStudio
-    return OpenAIEmbeddings(base_url=CONFIG.OPENAI_URL, check_embedding_ctx_length=False)
+    return EmbeddingContext(
+        OpenAIEmbeddings(base_url=CONFIG.OPENAI_URL, check_embedding_ctx_length=False),
+        CONFIG.EMBEDDING_MODEL_DIMENSIONS,
+    )
 
 
 @lru_cache
@@ -49,9 +60,8 @@ def get_qdrant_client() -> QdrantClient:
     return QdrantClient(CONFIG.QDRANT_URL)
 
 
-def get_vector_store(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> QdrantVectorStore:
+def get_vector_store(embedding_ctx: EmbeddingContext) -> QdrantVectorStore:
     client = get_qdrant_client()
-    logging.debug(f"{embedding_dimensions=}")
     try:
         client.get_collection(collection_name=QDRANT_COLLECTION)
     except qdrant_client.http.exceptions.UnexpectedResponse as err:
@@ -60,7 +70,7 @@ def get_vector_store(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> 
 
         client.create_collection(
             collection_name=QDRANT_COLLECTION,
-            vectors_config=types.VectorParams(size=embedding_dimensions, distance=Distance.COSINE),
+            vectors_config=types.VectorParams(size=embedding_ctx.dimensions, distance=Distance.COSINE),
         )
 
     client.create_payload_index(
@@ -68,10 +78,7 @@ def get_vector_store(embedding: OpenAIEmbeddings, embedding_dimensions: int) -> 
         field_name="manufacturer",
         field_schema=PayloadSchemaType.TEXT,
     )
-    return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding)
-
-
-class VectorStoreBuilder:
+    return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding_ctx.model)
 
 
 from datetime import datetime
@@ -120,16 +127,16 @@ def sql_to_qdrant_point(sql_record) -> PointStruct:
 
     summarized_sql_record = _summarize_sql_record(sql_record)
     cleaned_record_summary = _clean_record_summary(summarized_sql_record)
-    record_summary_embedding = get_lms_embedding_model().embed_query(cleaned_record_summary)
+    record_summary_embedding = get_lms_embedding_model_context().model.embed_query(cleaned_record_summary)
     qdrant_point = _prepare_for_qdrant(sql_record, cleaned_record_summary, record_summary_embedding)
     return qdrant_point
 
 
 def db_iterator(batch_size: int = 100) -> Generator:
     with sqlite3.connect(DATABASE_PATH) as conn:
-        # headers = conn.execute("PRAGMA table_info(Products)").fetchall()
-        # headers = [header[1] for header in headers]
-        # logging.info(f"{headers=}")
+        headers = conn.execute("PRAGMA table_info(Products)").fetchall()
+        headers = [header[1] for header in headers]
+        logging.debug(f"DB: {headers=}")
 
         op_sql = conn.execute("SELECT * FROM Products")
         total_records_transformed = 0
@@ -171,14 +178,14 @@ def upload_database_to_qdrant(vs, client):
 
 def main():
     vs_client = get_qdrant_client()
-    embedding_model = get_lms_embedding_model()
-    vs = get_vector_store(embedding_model, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    embedding_ctx = get_lms_embedding_model_context()
+    vs = get_vector_store(embedding_ctx)
 
     _ = upload_database_to_qdrant(vs, vs_client)
 
     # user_input = input("Text for search: ")
     user_input = "Dubious parenting advice"
-    vector = embedding_model.embed_query(user_input)
+    vector = embedding_ctx.model.embed_query(user_input)
     res = vs.similarity_search_by_vector(vector, k=5)
     for r in res:
         print(r.page_content, r.metadata)
@@ -187,7 +194,7 @@ def main():
         return sorted(results, key=lambda x: x.payload.get(field_name, ""), reverse=descending)
 
     user_input = "tennis racket"
-    vector = embedding_model.embed_query(user_input)
+    vector = embedding_ctx.model.embed_query(user_input)
     search_filter = Filter(
         must=[
             FieldCondition(
@@ -211,6 +218,25 @@ def main():
 if __name__ == "__main__":
     main()
 
+
+class QdrantSearchRag(ISearchRag):
+    embedding_context: EmbeddingContext
+
+    def __init__(self, embedding_ctx: EmbeddingContext | None = None):
+        self.embedding_ctx = embedding_ctx if embedding_ctx is not None else get_lms_embedding_model_context()
+
+    @property
+    def embedding_model(self):
+        if self._embedding_model is None:
+            self._embedding_model = get_lms_embedding_model_context()
+
+        return self.embedding_context.model
+
+    def search(self, query: str, top_k: int = 5): ...
+    def upload_database(self): ...
+    def get_manufacturers(self): ...
+
+
 # ===========================================================
 # tests
 # ===========================================================
@@ -224,7 +250,7 @@ def test_db_op_delete():
 
 
 def test_vector_store_with_embeddings():
-    vs = get_vector_store(get_lms_embedding_model(), CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    vs = get_vector_store(get_lms_embedding_model_context())
     vs.add_texts(["hello", "world"], ids=[1, 2])
     res = vs.search("hello", search_type="similarity", k=1)
     assert len(res) == 1
@@ -232,6 +258,5 @@ def test_vector_store_with_embeddings():
 
 def test_database_upload():
     client = get_qdrant_client()
-    embedding = get_lms_embedding_model()
-    vs = get_vector_store(embedding, CONFIG.EMBEDDING_MODEL_DIMENSIONS)
+    vs = get_vector_store(get_lms_embedding_model_context())
     upload_database_to_qdrant(vs, client)
