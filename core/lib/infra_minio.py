@@ -29,7 +29,7 @@ class FileNotFoundError(StorageError): ...
 # ===========================================================
 
 from abc import ABC, abstractmethod
-from typing import AsyncContextManager, BinaryIO
+from typing import AsyncContextManager, AsyncGenerator, BinaryIO
 
 
 class ObjectStorage(ABC):
@@ -92,7 +92,7 @@ class MinioObjectStorage(ObjectStorage):
                 raise StorageError(f"Upload failed: {e}") from e
 
     @asynccontextmanager
-    async def download(self, key: str) -> AsyncIterator[BinaryIO]:
+    async def download(self, key: str) -> AsyncGenerator[BinaryIO, None]:
         key = self._add_prefix(key)
         async with self.client as client:
             try:

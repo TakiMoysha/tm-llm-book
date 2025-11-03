@@ -2,21 +2,25 @@
 # prepare & facilities
 # ===========================================================
 
-from dataclasses import dataclass
 import logging
 import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Generator, Protocol, runtime_checkable
-from tqdm import tqdm
+from typing import Generator
 
-from langchain_openai import OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
 import qdrant_client
 import qdrant_client.http.exceptions
+from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client.qdrant_client import QdrantClient
+from tabulate import tabulate
+
 from core.lib.env_config import EnvConfig
-from core.rag.interfaces import ISearchRag
+from core.rag.interfaces import ISearchRag, UIHooks
+from core.rag.query_context import QueryContext
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
 
@@ -28,11 +32,34 @@ DATABASE_PATH = Path("./data/products.db")
 assert DATABASE_PATH.exists(), f"{DATABASE_PATH} does not exist"
 
 
-def op_delete():
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        res = conn.execute("SELECT * FROM products WHERE Deleted = '1'")
-        records = res.fetchall()
-        logging.debug(f"records: {records}")
+class ProductsLoader:
+    _path: Path
+
+    def __init__(self, path: Path | str):
+        if isinstance(path, str):
+            path = Path(path)
+
+        if not path.exists() or not path.is_file():
+            raise ValueError(f"{path} does not exist or is not a file")
+
+        self._path = path
+
+    def debug_call(self):
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            res = conn.execute("SELECT * FROM products")
+            records = res.fetchall()
+            logging.debug(f"DatabaseLoader.debug_call:{records=}")
+
+    def into_iter(self, batch_size: int = 100) -> Generator:
+        with sqlite3.connect(str(self._path)) as conn:
+            # headers = conn.execute("PRAGMA table_info(Products)").fetchall()
+            # headers = [header[1] for header in headers]
+            # logging.debug(f"DB: {headers=}")
+
+            op_sql = conn.execute("SELECT * FROM Products")
+
+            while rows := op_sql.fetchmany(batch_size):
+                yield rows
 
 
 @dataclass
@@ -81,9 +108,6 @@ def get_vector_store(embedding_ctx: EmbeddingContext) -> QdrantVectorStore:
     return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding_ctx.model)
 
 
-from datetime import datetime
-
-date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ===========================================================
@@ -96,6 +120,8 @@ from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, P
 
 
 def sql_to_qdrant_point(sql_record) -> PointStruct:
+    _date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     def _summarize_sql_record(sql_record):
         record_summary_string = f"""
         Product_Name: {sql_record[1]}
@@ -117,7 +143,7 @@ def sql_to_qdrant_point(sql_record) -> PointStruct:
             "product_description": record[2],
             "technical_specs": record[3],
             "manufacturer": record[4],
-            "date_modified": date_str,
+            "date_modified": _date_str,
         }
         return PointStruct(
             id=record[0],
@@ -132,109 +158,117 @@ def sql_to_qdrant_point(sql_record) -> PointStruct:
     return qdrant_point
 
 
-def db_iterator(batch_size: int = 100) -> Generator:
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        headers = conn.execute("PRAGMA table_info(Products)").fetchall()
-        headers = [header[1] for header in headers]
-        logging.debug(f"DB: {headers=}")
+class QdrantSearchRag(ISearchRag):
+    embedding_ctx: EmbeddingContext
+    _qdrant_client: QdrantClient | None = None
+    _vector_store: QdrantVectorStore | None = None
 
-        op_sql = conn.execute("SELECT * FROM Products")
-        total_records_transformed = 0
+    def __init__(self, embedding_ctx: EmbeddingContext | None = None):
+        self.embedding_ctx = embedding_ctx or get_lms_embedding_model_context()
 
-        while True:
-            if not (rows := op_sql.fetchmany(batch_size)):
-                return
+    @property
+    def embedding_model(self):
+        if self.embedding_ctx is None:
+            self.embedding_ctx = get_lms_embedding_model_context()
 
-            yield rows
+        return self.embedding_ctx.model
 
-            total_records_transformed += len(rows)
-            logging.info(f"{total_records_transformed=}")
+    @property
+    def qdrant_client(self):
+        if self._qdrant_client is None:
+            self._qdrant_client = get_qdrant_client()
 
+        return self._qdrant_client
 
-def upload_database_to_qdrant(vs, client):
-    _DELETE_MARK = -1
-    _BATCH_SIZE = 100
+    @property
+    def vector_store(self):
+        if self._vector_store is None:
+            self._vector_store = get_vector_store(self.embedding_ctx)
 
-    with tqdm(total=None, desc="Uploading to Qdrant", unit="records") as bar:
-        for batch in db_iterator(batch_size=_BATCH_SIZE):
+        return self._vector_store
+
+    def load_sources(
+        self,
+        *,
+        batch_size: int = 100,
+        ui_hooks: UIHooks | None = None,
+    ):
+        _DELETE_MARK_INDEX = -1
+
+        _progress_update_cb = getattr(ui_hooks, "on_progress_update", (lambda _: None))
+
+        products_source = ProductsLoader(DATABASE_PATH)
+
+        for i, batch in enumerate(products_source.into_iter(batch_size=batch_size)):
             points: list[PointStruct] = []
 
             for record in batch:
-                if record[_DELETE_MARK]:
-                    try:
-                        vs.delete(documents=[{"id": str(record[0])}])
-                    except Exception:
-                        points.append(sql_to_qdrant_point(record))
-                    continue
-                else:
-                    # bar = bar(f"Summarizing record with ID {record[0]}")
+                should_upsert = True
+                try:
+                    if record[_DELETE_MARK_INDEX] and self.vector_store.delete(documents=[{"id": str(record[0])}]):
+                        should_upsert = False
+                except Exception as err:
+                    logging.error(f"Failed to delete record {record}: {err}")
+                    should_upsert = True
+
+                if should_upsert:
                     points.append(sql_to_qdrant_point(record))
 
-                bar.update()
-                bar.set_postfix({"record_id": record[0], "product_name": record[1]})
+                _progress_update_cb(i + 1)
 
-        client.upsert(QDRANT_COLLECTION, points)
+            self.qdrant_client.upsert(QDRANT_COLLECTION, points)
+
+    # TODO: переписать на монойдный манер
+    def search(self, query: QueryContext): ...
+
+    def example_similarity_search(self, query: str, *, top_k: int = 5):
+        """Simple example of search based on similarity."""
+        vector = self.embedding_model.embed_query(query)
+        return self.vector_store.similarity_search_by_vector(vector, k=top_k)
+
+    def example_search_with_filter(self, query: str, *, top_k: int = 5):
+        """
+        Example with filter and sorting.
+
+        Sorting include in 'search' because results can returned in different order,
+        so it's better to sort them as part of procedure.
+        """
+        vector = self.embedding_model.embed_query(query)
+        search_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="manufacturer",
+                    match=MatchValue(value="Banana Angel inc."),
+                )
+            ]
+        )
+        res = self.qdrant_client.query_points(
+            collection_name=QDRANT_COLLECTION,
+            query=vector,
+            query_filter=search_filter,
+            limit=top_k,
+            with_payload=["product_name"],
+        )
+
+        def _sort_results(results, field_name, descending=False):
+            return sorted(results, key=lambda x: x.payload.get(field_name, ""), reverse=descending)
+
+        return _sort_results(res.points, "product_name", descending=False)
 
 
 def main():
-    vs_client = get_qdrant_client()
-    embedding_ctx = get_lms_embedding_model_context()
-    vs = get_vector_store(embedding_ctx)
+    rag = QdrantSearchRag()
+    # rag.load_sources()
 
-    _ = upload_database_to_qdrant(vs, vs_client)
+    results: list[Document] = rag.example_similarity_search("Dubious parenting advice", top_k=5)
+    print(tabulate(results, headers=("",)))
 
-    # user_input = input("Text for search: ")
-    user_input = "Dubious parenting advice"
-    vector = embedding_ctx.model.embed_query(user_input)
-    res = vs.similarity_search_by_vector(vector, k=5)
-    for r in res:
-        print(r.page_content, r.metadata)
-
-    def _sort_results(results, field_name, descending=False):
-        return sorted(results, key=lambda x: x.payload.get(field_name, ""), reverse=descending)
-
-    user_input = "tennis racket"
-    vector = embedding_ctx.model.embed_query(user_input)
-    search_filter = Filter(
-        must=[
-            FieldCondition(
-                key="manufacturer",
-                match=MatchValue(value="Banana Angel inc."),
-            )
-        ]
-    )
-    res = vs_client.query_points(
-        collection_name=QDRANT_COLLECTION,
-        query=vector,
-        query_filter=search_filter,
-        limit=5,
-        with_payload=["product_name"],
-    )
-    sorted_res = _sort_results(res.points, "product_name", descending=False)
-    for r in sorted_res:
-        print(r)
+    results = rag.example_search_with_filter("tennis racket")
+    print(tabulate(results, headers=("",)))
 
 
 if __name__ == "__main__":
     main()
-
-
-class QdrantSearchRag(ISearchRag):
-    embedding_context: EmbeddingContext
-
-    def __init__(self, embedding_ctx: EmbeddingContext | None = None):
-        self.embedding_ctx = embedding_ctx if embedding_ctx is not None else get_lms_embedding_model_context()
-
-    @property
-    def embedding_model(self):
-        if self._embedding_model is None:
-            self._embedding_model = get_lms_embedding_model_context()
-
-        return self.embedding_context.model
-
-    def search(self, query: str, top_k: int = 5): ...
-    def upload_database(self): ...
-    def get_manufacturers(self): ...
 
 
 # ===========================================================
@@ -244,9 +278,18 @@ class QdrantSearchRag(ISearchRag):
 import pytest
 
 
-@pytest.mark.facilities
-def test_db_op_delete():
-    op_delete()
+@pytest.fixture(name="db")
+def _database():
+    return ProductsLoader(DATABASE_PATH)
+
+
+@pytest.fixture(name="qdrant_rag")
+def qdrant_rag():
+    return QdrantSearchRag()
+
+
+def test_db_op_delete(db: ProductsLoader):
+    db.debug_call()
 
 
 def test_vector_store_with_embeddings():
@@ -256,7 +299,6 @@ def test_vector_store_with_embeddings():
     assert len(res) == 1
 
 
-def test_database_upload():
-    client = get_qdrant_client()
-    vs = get_vector_store(get_lms_embedding_model_context())
-    upload_database_to_qdrant(vs, client)
+@pytest.mark.integration
+def test_database_upload(rag: QdrantSearchRag):
+    rag.load_sources()

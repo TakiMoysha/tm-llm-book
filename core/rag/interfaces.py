@@ -1,40 +1,30 @@
-from typing import Any, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Callable, Protocol, runtime_checkable
+
+# ===========================================================
+# CORE
+# ===========================================================
 
 
 @runtime_checkable
 class ISearchRag(Protocol):
-    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
-        """
-        Hybrid search.
-
-        Args:
-            query (str): Human-readable search query.
-            top_k (int): Number of top results.
-
-        Returns:
-            List[Dict[str, Any]]: List of results with fields:
-                - "product_name"
-                - "product_description"
-                - "technical_specs"
-                - "manufacturer"
-                - "score" (float, от 0 до 1)
-        """
+    def search(self, query: str, top_k: int = 5, *args, **kwargs):
+        """Hybrid search."""
         ...
 
-    def upload_database(self) -> str:
-        """
-        Upload database to Qdrant.
-
-        Returns:
-            str: Status message.
-        """
+    def load_sources(self, *args, **kwargs) -> str:
+        """Upload database to Qdrant."""
         ...
 
-    def get_manufacturers(self) -> list[str]:
-        """
-        Return list of unique manufacturers.
 
-        Returns:
-            List[str]: List of manufacturers.
-        """
-        ...
+# ===========================================================
+# UI
+# ===========================================================
+
+
+@dataclass
+class UIHooks:
+    on_progress_update: Callable[[int], None] | None = None
+    on_status_update: Callable[[str], None] | None = None
+    on_error: Callable[[Exception], None] | None = None
+    on_success: Callable[[str], None] | None = None

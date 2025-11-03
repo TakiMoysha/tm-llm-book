@@ -14,4 +14,10 @@ run filename *ARGS:
 
 [doc("ex: just test scripts/playground.py -m target")]
 test target *ARGS:
-    uv run pytest --disable-warnings --verbose --capture=no {{ ARGS }} {{ target }}
+  uv run pytest --disable-warnings --verbose --capture=no {{ ARGS }} {{ target }}
+
+lint:
+  uv run mypy .
+
+infra_up:
+  podman-compose -f compose/qdrant.compose.yaml up -d

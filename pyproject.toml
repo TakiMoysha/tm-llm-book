@@ -9,10 +9,14 @@ dependencies = [
   "langchain>=0.3.27",
   "langchain-community>=0.3.29",
   "langchain-openai>=0.3.33",
+  "langchain-qdrant>=0.2.1",
   "langgraph>=0.6.6",
   "unstructured>=0.18.15",
   "llama-cpp-python>=0.3.16",
+  "fastmcp",
+  "mcp[cli]",
   #
+  "streamlit>=1.51.0",
   "gradio>=5.44.1",
   #
   "httpx>=0.28.1",
@@ -24,13 +28,12 @@ dependencies = [
   "textblob>=0.19.0",
   "markdown>=3.9",
   "lmstudio>=1.5.0",
-  "langchain-qdrant>=0.2.1",
-  # scripts
+  #
   "aioboto3>=15.4.0",
   "minio>=7.2.18",
   "progressbar2>=4.5.0",
   "tqdm>=4.67.1",
-  "streamlit>=1.51.0",
+  "tabulate>=0.9.0",
 ]
 
 [build-system]
@@ -38,12 +41,10 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [dependency-groups]
-shared = ["fastmcp", "mcp[cli]"]
-dev = ["aiosqlite>=0.21", "httpx>=0.28"]
+dev = ["aiosqlite>=0.21"]
 test = [
   "pytest>=8.3",
   "hypothesis>=6.130.2",
-  "httpx>=0.28.1",
   "coverage",
   "pytest",
   "pytest-asyncio",
@@ -55,7 +56,9 @@ test = [
   "pytest-sqlalchemy>=0.2.1",
   "pytest-databases[redis]>=0.1.0",
   "pytest-timeout>=2.3.1",
-  "tabulate>=0.9.0",
+]
+linting = [
+    "mypy>=1.18.2",
 ]
 
 [tool.uv]
@@ -68,9 +71,10 @@ lint.fixable = ["ALL"]
 lint.ignore = [
   "E402",
 ]
-src = ["libs/**/*", "services/**/*"]
+src = ["core/**/*"]
 target-version = "py312"
-extend-exclude = ["**/migrations"]
+
+format.line-ending = "auto"
 
 [tool.pytest.ini_options]
 log_cli = true
@@ -86,8 +90,30 @@ filterwarnings = [
   "ignore::DeprecationWarning:google.*",
   "ignore::DeprecationWarning:passlib.*",
   "ignore::DeprecationWarning:aiosql.*",
-  "ignore::DeprecationWarning:litestar.constants.*",
-  "ignore::DeprecationWarning:litestar.utils.*",
-  "ignore::DeprecationWarning:litestar.cli.*",
   "ignore::DeprecationWarning:httpx._client",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+
+# Strict checks configuration
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+# warn_return_any = true # Uncomment if you want to be warned about functions returning Any
+# warn_redundant_casts = true # Uncomment if you want to be warned about redundant casts
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+# disallow_any_generics = true # Uncomment for stricter generics checks
+
+# How to handle imports
+ignore_missing_imports = true # Often needed for third-party libraries without stubs
+follow_imports = "silent" # 'normal', 'skip', 'error' are other options
+
+# Pretty output
+pretty = true
+
+# Exclude common directories
+exclude = ["venv", ".venv", "build", "dist"]
