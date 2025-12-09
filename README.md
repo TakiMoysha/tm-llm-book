@@ -324,7 +324,17 @@ LangSmith помогает с этим:
 
 ## Infrastructure
 
-- model.com
+# Benchmarks
+
+## RAG101 Triage Benchmark
+
+### Tasks
+
+**so_vector** - используется дамп вопросов со stackoverflow, это 2 миллиона вопросов прошедших через embedding `multi-qa-mpnet-base-cos-v1`
+
+**dense_vector** - используется набор данных yandex DEEP1B, это 10M векторов 96 размерности.
+
+**openai_vector** - pending
 
 # Templates
 
@@ -363,7 +373,7 @@ System Components
 - Descomposition Description
 - Dependency Description
 - Interface Description
-- UX/UI 
+- UX/UI
 
 Detailed Design
 - Module Detailed Design

@@ -16,5 +16,4 @@ wheels/
 # datafiles
 data
 assets
-# references
-!.gitkeep
+references
