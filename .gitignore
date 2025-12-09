@@ -15,3 +15,5 @@ wheels/
 
 # datafiles (download from s3)
 data/*
+
+assets/*
