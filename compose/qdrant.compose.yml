@@ -6,5 +6,5 @@ services:
     volume: 
       - qdrant-data:/qdrant/storage
 
-volume:
+volumes:
   qdrant-data:

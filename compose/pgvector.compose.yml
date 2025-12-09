@@ -1,0 +1,14 @@
+services:
+  llm-postgres:
+    image: pgvector/pgvector:0.8.1-pg18-trixie
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: vectordb
+      POSTGRES_USER: llm_user
+      POSTGRES_PASSWORD: llm_password
+    volumes:
+      - llm-pgvector-infra:/var/lib/postgresql
+
+volumes:
+  llm-pgvector-infra:

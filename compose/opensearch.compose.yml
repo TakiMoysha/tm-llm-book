@@ -1,0 +1,35 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:3
+    hostname: "llm-triage-os-1"
+    ports:
+      - 9200:9200
+      - 9600:9600
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # disables swapping, memolock setting below
+      - search.concurrent_segment_search.enabled=true
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD="password"
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g" # minimum and maximum java heap size
+    volumes:
+      - llm-triage-opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD", "curl -s http://localhost:9200/_cluster/health?pretty"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+
+  opensearch-dashboard:
+    image: opensearchproject/opensearch-dashboards:3
+    container_name: llm-triage-os-dashboards
+    ports:
+      - 5601:5601
+    environment:
+      - "OPENSEARCH_HOSTS=http://llm-triage-os-1:9200"
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      - opensearch
+
+volumes:
+  llm-triage-opensearch-data:
