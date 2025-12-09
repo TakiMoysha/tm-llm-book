@@ -13,7 +13,8 @@ wheels/
 .venv
 .env
 
-# datafiles (download from s3)
-data/*
-
-assets/*
+# datafiles
+data
+assets
+# references
+!.gitkeep

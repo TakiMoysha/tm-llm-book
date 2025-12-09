@@ -108,8 +108,6 @@ def get_vector_store(embedding_ctx: EmbeddingContext) -> QdrantVectorStore:
     return QdrantVectorStore(client=client, collection_name=QDRANT_COLLECTION, embedding=embedding_ctx.model)
 
 
-
-
 # ===========================================================
 # core
 # ===========================================================
