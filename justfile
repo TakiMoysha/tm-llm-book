@@ -12,9 +12,18 @@ EMBEDDING_MODEL_DIMENSIONS := "768"
 run filename *ARGS:
   uv run {{ filename }} {{ ARGS }}
 
-[doc("ex: just test core/playground.py -m target")]
+[doc("""ex:
+  just test core/playground.py -m target 
+  just test core/playground.py -m target --verbose --memray --memray-bin-path=data
+""")]
 test target *ARGS:
-  uv run pytest --disable-warnings --verbose --capture=no {{ ARGS }} {{ target }}
+  uv run pytest --disable-warnings --no-header --capture=no {{ ARGS }} {{ target }}
+
+[doc("""ex:
+  just memray flamegraph data/<filename.bin>
+""")]
+memray profile filename *ARGS:
+  uv run memray {{ profile }} {{ filename }} {{ ARGS }}
 
 lint:
   uv run mypy .

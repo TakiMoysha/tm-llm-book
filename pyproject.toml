@@ -37,6 +37,7 @@ dependencies = [
   "psycopg[binary]>=3.3.2",
   "elasticsearch[async]>=9.2.0",
   "opensearch-py>=3.1.0",
+  "pytest-memray>=1.8.0",
 ]
 
 [build-system]
