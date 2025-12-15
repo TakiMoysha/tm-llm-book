@@ -5,23 +5,22 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "ipython>=9.5.0",
-  "langchain>=0.3.27",
-  "langchain-community>=0.3.29",
-  "langchain-openai>=0.3.33",
-  "langchain-qdrant>=0.2.1",
-  "langgraph>=0.6.6",
-  "unstructured>=0.18.15",
-  "llama-cpp-python>=0.3.16",
+  "ipython",
+  "langchain",
+  "langchain-community",
+  "langchain-openai",
+  "langchain-qdrant",
+  "langgraph",
+  "unstructured",
   "fastmcp",
   "mcp[cli]",
   #
-  "streamlit>=1.51.0",
-  "gradio>=5.44.1",
+  "streamlit",
+  "gradio",
   #
-  "httpx>=0.28.1",
-  "qdrant-client>=1.15.1",
-  "sentence-transformers>=5.1.0",
+  "httpx",
+  "qdrant-client",
+  "sentence-transformers",
   #
   "asyncio>=4.0.0",
   "anyio>=4.9.0",
@@ -61,20 +60,18 @@ test = [
   "pytest-databases[redis]>=0.1.0",
   "pytest-timeout>=2.3.1",
 ]
-linting = [
-    "mypy>=1.18.2",
-]
+linting = ["mypy>=1.18.2"]
 
 [tool.uv]
 default-groups = "all"
+
+[tool.uv.workspace]
 
 [tool.ruff]
 line-length = 120
 fix = true
 lint.fixable = ["ALL"]
-lint.ignore = [
-  "E402",
-]
+lint.ignore = ["E402"]
 src = ["core/**/*"]
 target-version = "py312"
 
@@ -114,7 +111,7 @@ disallow_untyped_decorators = true
 
 # How to handle imports
 ignore_missing_imports = true # Often needed for third-party libraries without stubs
-follow_imports = "silent" # 'normal', 'skip', 'error' are other options
+follow_imports = "silent"     # 'normal', 'skip', 'error' are other options
 
 # Pretty output
 pretty = true
