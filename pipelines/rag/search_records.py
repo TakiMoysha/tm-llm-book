@@ -18,9 +18,9 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client.qdrant_client import QdrantClient
 from tabulate import tabulate
 
-from core.lib.env_config import EnvConfig
-from core.rag.interfaces import ISearchRag, UIHooks
-from core.rag.query_context import QueryContext
+from pipelines.lib.env_config import EnvConfig
+from pipelines.rag.interfaces import ISearchRag, UIHooks
+from pipelines.rag.query_context import QueryContext
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
 

@@ -14,7 +14,7 @@ from langchain_qdrant import QdrantVectorStore
 import qdrant_client
 import qdrant_client.http.exceptions
 from qdrant_client.qdrant_client import QdrantClient
-from core.lib.env_config import EnvConfig
+from pipelines.lib.env_config import EnvConfig
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARN)  # for direct running
 

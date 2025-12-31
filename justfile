@@ -13,8 +13,8 @@ run filename *ARGS:
   uv run {{ filename }} {{ ARGS }}
 
 [doc("""ex:
-  just test core/playground.py -m target 
-  just test core/playground.py -m target --verbose --memray --memray-bin-path=data
+  just test pipelines/playground.py -m target 
+  just test pipelines/playground.py -m target --verbose --memray --memray-bin-path=data
 """)]
 test target *ARGS:
   uv run pytest --disable-warnings --no-header --capture=no {{ ARGS }} {{ target }}

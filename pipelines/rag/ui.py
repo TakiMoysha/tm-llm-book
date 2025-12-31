@@ -1,6 +1,6 @@
 import streamlit as st
 
-from core.rag.search_records import upload_database_to_qdrant
+from pipelines.rag.search_records import upload_database_to_qdrant
 
 
 # === Настройки страницы ===

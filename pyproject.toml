@@ -65,14 +65,12 @@ linting = ["mypy>=1.18.2"]
 [tool.uv]
 default-groups = "all"
 
-[tool.uv.workspace]
-
 [tool.ruff]
 line-length = 120
 fix = true
 lint.fixable = ["ALL"]
 lint.ignore = ["E402"]
-src = ["core/**/*"]
+src = ["pipelines/**/*"]
 target-version = "py312"
 
 format.line-ending = "auto"
