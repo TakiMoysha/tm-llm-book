@@ -34,7 +34,22 @@ if __name__ == "__main__":
         help="Path to output text file, as raw text file.",
     )
 
+    support_group = parser.add_argument_group("support")
+    support_group.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable DEBUG level for logging.",
+    )
+    support_group.add_argument(
+        "--load-model",
+        action="store_true",
+        help="Load model into memory.",
+    )
+
     args = vars(parser.parse_args())
+
+    if args.get("debug") and logging.getLogger().setLevel(logging.DEBUG):
+        logging.debug("DEBUG logging enabled")
 
     main(**args)
 
