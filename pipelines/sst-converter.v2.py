@@ -1,59 +1,31 @@
-"""funasr not working, maybe AutoModel can't correct load model"""
-
-import logging
-import sys
 from argparse import ArgumentParser
-from enum import StrEnum
 from pathlib import Path
 
-import torch
-from funasr import AutoModel
+import whisper
+
+import logging
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
-
-FORCE_CPU = False
-
-
-class ASR_MODELS(StrEnum):
-    # FALLBACK = "FunAudioLLM/SenseVoiceSmall"
-    FALLBACK = "FunAudioLLM/Fun-ASR-Nano-2512"
-    RIMARY = "NOT_EXISTS"
-
-    fallback = property(lambda cls: cls.FALLBACK)
-    default = property(lambda cls: cls.PRIMARY)
-
+MODEL_SIZE = "tiny"
 
 # ==========================================================================================
 
 
+def extract_audio(input_path: Path) -> Path: ...
+
+
 def transcribe_audio(input_path: Path, output_path: Path):
-    device = "cuda:0" if torch.cuda.is_available() and not FORCE_CPU else "cpu"
-    try:
-        model = AutoModel(
-            model=ASR_MODELS.FALLBACK,
-            trust_remote_code=True,
-            device=device,
-            chunk_size=[0, 10, 5],
-            chunk_interval=10,
-        )
-    except Exception as _err:
-        logging.error("Failed to load model: ", exc_info=True)
-        sys.exit(1)
+    model = whisper.load_model(MODEL_SIZE)
+    result = model.transcribe(
+        audio=str(input_path),
+    )
+    logging.debug(f"result: {result=}")
 
-    logging.info(f"Loaded model: {device=}")
-
-    try:
-        result = model.generate(input=str(input_path))
-    except Exception as _err:
-        logging.error("Failed to transcribe audio: ", exc_info=True)
-        sys.exit(1)
-
-    if (text := result[0].get("text")) is None:
-        raise Exception(f"Failed to transcribe audio, returned empty text: {result}")
+    text = result.get("text").strip()
 
     with open(output_path, "w") as f:
-        f.write(text[0]["text"].strip())
+        f.write(text)
 
     return text
 
@@ -115,10 +87,3 @@ if __name__ == "__main__":
         logging.debug(f"Loaded model: WIP")
 
     main(**args)
-
-
-# ===========================================================
-# tests
-# ===========================================================
-import lmstudio
-import pytest

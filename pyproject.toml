@@ -11,6 +11,7 @@ dependencies = [
   "langchain-openai",
   "langchain-qdrant",
   "langgraph",
+  "langsmith",
   "unstructured",
   "fastmcp",
   "mcp[cli]",
@@ -30,13 +31,17 @@ dependencies = [
   #
   "aioboto3>=15.4.0",
   "minio>=7.2.18",
-  "progressbar2>=4.5.0",
   "tqdm>=4.67.1",
   "tabulate>=0.9.0",
   "psycopg[binary]>=3.3.2",
   "elasticsearch[async]>=9.2.0",
   "opensearch-py>=3.1.0",
   "pytest-memray>=1.8.0",
+  # audio
+  "pipecat-ai[local,openai,whisper]>=0.0.98",
+  "openai-whisper>=20250625",
+  "ffmpeg-python>=0.2.0",
+  "pydub>=0.25.1",
 ]
 
 [build-system]
