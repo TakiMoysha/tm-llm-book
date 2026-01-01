@@ -17,3 +17,5 @@ wheels/
 data
 assets
 references
+
+*.txt

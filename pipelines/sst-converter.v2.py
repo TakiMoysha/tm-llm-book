@@ -84,6 +84,6 @@ if __name__ == "__main__":
         logging.debug("DEBUG logging enabled")
 
     if args.get("load_model"):
-        logging.debug(f"Loaded model: WIP")
+        logging.debug("Loaded model: WIP")
 
     main(**args)
