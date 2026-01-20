@@ -1,11 +1,12 @@
 import asyncio
+import collections
 import datetime
 import json
 import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import Iterable, TypedDict, cast
 
 import aiosqlite
 import dateutil
@@ -14,6 +15,10 @@ from lib.interfaces import IRepository
 from tqdm.auto import tqdm
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+
+DB_NAME = "discord_analytics.db"
+
+# ==========================================================================================
 
 
 @dataclass
@@ -25,31 +30,28 @@ class Config:
             raise ValueError("DISCORD_TOKEN is not set")
 
 
-class MessageRepository:
-    SQL_SCHEMA = """
-        CREATE TABLE IF NOT EXISTS messages (
-            id TEXT PRIMARY KEY,
-            channel_id TEXT,
-            author_id TEXT,
-            author_username TEXT,
-            content TEXT,
-            message_json JSON
-        );
-    """
-    SQL_INSERT_MESSAGE = """
-        INSERT INTO messages (id, channel_id, author_id, author_username, content, message_json)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO NOTHING
-    """
+# ==========================================================================================
 
-    def __init__(self, url: str = "messages.db", *, batch_size: int = 1000) -> None:
+
+class MessageRepository:
+    def __init__(self, url: str = DB_NAME, *, batch_size: int = 1000) -> None:
         self._url = url
         self._batch_size = batch_size
 
     async def try_create_table(self):
+        SQL_CREATE_MESSAGES_TABLE = """
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                channel_id TEXT,
+                author_id TEXT,
+                author_username TEXT,
+                content TEXT,
+                message_json JSON
+            );
+        """
         async with aiosqlite.connect(self._url) as conn:
             async with conn.cursor() as cursor:
-                await cursor.execute(self.SQL_SCHEMA)
+                await cursor.execute(SQL_CREATE_MESSAGES_TABLE)
                 await cursor.execute("PRAGMA synchronous = NORMAL;")
                 await conn.commit()
 
@@ -58,6 +60,12 @@ class MessageRepository:
             json.dump(buffer, f)
 
     async def bulk_save(self, messages: list[dict]):
+        SQL_INSERT_MESSAGE = """
+            INSERT INTO messages (id, channel_id, author_id, author_username, content, message_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO NOTHING
+        """
+
         # self._fs_cache(messages)
         if not messages:
             logging.warning("No messages to save")
@@ -87,7 +95,7 @@ class MessageRepository:
                     ]
 
                     try:
-                        await conn.executemany(self.SQL_INSERT_MESSAGE, chunk_data)
+                        await conn.executemany(SQL_INSERT_MESSAGE, chunk_data)
                         saved += conn.total_changes - initial_changes  # added only no duplicate keys
                         initial_changes = conn.total_changes
                         pbar.update(len(chunk))
@@ -98,14 +106,23 @@ class MessageRepository:
                     pbar.update(len(chunk))
 
                     _end_chunk_time = time.perf_counter()
-                    logging.info(
-                        f"Saved chunk {i // self._batch_size} in {_end_chunk_time - _start_chunk_time:.2f} seconds"
-                    )
+                    pbar.set_description(f"Saved {saved}/{total} in {_end_chunk_time - _start_time:.2f} seconds")
 
                 await conn.commit()
 
         _end_time = time.perf_counter()
         logging.info(f"Saved {saved}/{total} in {_end_time - _start_time:.2f} seconds. Failed chunks: {failed_chunks}")
+
+    async def get_messages_content(self, limit: int = 200, offset: int = 0):
+        MessageContent = collections.namedtuple("MessageContent", ["cursor", "content"])
+        async with aiosqlite.connect(self._url) as conn:
+            conn.row_factory = MessageContent
+            res_cur = await conn.execute(
+                "SELECT content FROM messages LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+            result, length = cast(Iterable[MessageContent], await res_cur.fetchall()), res_cur.rowcount
+            return result, length
 
 
 assert isinstance(MessageRepository, IRepository)
@@ -127,6 +144,7 @@ class DiscordAdapter:
             res.raise_for_status()
             data = res.json()
             _buffer.extend(data)
+            return None if not data else data[-1]
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -134,18 +152,21 @@ class DiscordAdapter:
                 headers=headers,
                 params={"limit": limit},
             )
-            process_messages(response, buffer)
-            # last_msg_datetime = datetime.datetime.strptime(buffer[0]["timestamp"], DISCORD_TIMESTAMP_FORMAT)
-            last_msg_datetime = dateutil.parser.parse(buffer[-1]["timestamp"])
+            support_msg = process_messages(response, buffer)
+
+            if support_msg is None:
+                return
+
+            last_msg_datetime = dateutil.parser.parse(support_msg["timestamp"])
 
             while last_msg_datetime.timestamp() > target_last_datetime.timestamp():
                 response = await client.get(
                     DISCORD_API_MESSAGES_URL,
                     headers=headers,
-                    params={"limit": limit, "before": buffer[-1]["id"]},
+                    params={"limit": limit, "before": support_msg["id"]},
                 )
-                process_messages(response, buffer)
-                last_msg_datetime = dateutil.parser.parse(buffer[-1]["timestamp"])
+                support_msg = process_messages(response, buffer)
+                last_msg_datetime = dateutil.parser.parse(support_msg["timestamp"])
                 await asyncio.sleep(0.4)
 
         return buffer
@@ -162,6 +183,7 @@ pytestmark = pytest.mark.asyncio
 class DiscordOptions(TypedDict):
     server_id: str
     channel_id: str
+
 
 @pytest.fixture(name="discord_opts")
 def discord_test_options(request):
@@ -186,8 +208,27 @@ async def test_sqlite_json():
         assert valid
 
 
+@pytest.mark.target
+async def test_pagination_message_content():
+    repo = MessageRepository()
+
+    async def paging_message_content(_repo: MessageRepository):
+        page_size, offset = 200, 0
+        length = -1
+
+        while length != 0:
+            messages, length = await repo.get_messages_content(limit=page_size, offset=offset)
+            offset += length
+            yield messages
+
+    page_generator = await anext(paging_message_content(repo))
+
+    for msg in page_generator:
+        logging.info(f"Got <{msg[1]}> messages")
+
+
 @pytest.mark.pipeline
-async def test_pipeline(discord_opts: DiscordOptions):
+async def test_discord_download_history(discord_opts: DiscordOptions):
     config = Config()
     message_repository = MessageRepository()
     await message_repository.try_create_table()
@@ -196,4 +237,5 @@ async def test_pipeline(discord_opts: DiscordOptions):
         discord_opts.get("channel_id"),
         headers={"Authorization": f"{config.discord_token}"},
     )
-    await message_repository.bulk_save(messages[::-1])
+    assert messages, "Downloaded messages is None"
+    await message_repository.bulk_save(messages)
