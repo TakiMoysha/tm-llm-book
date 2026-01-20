@@ -114,14 +114,14 @@ class MessageRepository:
         logging.info(f"Saved {saved}/{total} in {_end_time - _start_time:.2f} seconds. Failed chunks: {failed_chunks}")
 
     async def get_messages_content(self, limit: int = 200, offset: int = 0):
-        MessageContent = collections.namedtuple("MessageContent", ["cursor", "content"])
+        MessageContent = collections.namedtuple("MessageContent", ["content"])
+        SQL_SELECT_PAGE = "SELECT content FROM messages LIMIT ? OFFSET ?"
+
         async with aiosqlite.connect(self._url) as conn:
-            conn.row_factory = MessageContent
-            res_cur = await conn.execute(
-                "SELECT content FROM messages LIMIT ? OFFSET ?",
-                (limit, offset),
-            )
-            result, length = cast(Iterable[MessageContent], await res_cur.fetchall()), res_cur.rowcount
+            conn.row_factory = type("_", tuple(), {"__new__": lambda _, cursor, row: MessageContent(row[0])})
+            msg_cur = await conn.execute(SQL_SELECT_PAGE, (limit, offset))
+            logging.info(f"Got page with {msg_cur.rowcount} messages")
+            result, length = cast(Iterable[MessageContent], await msg_cur.fetchall()), msg_cur.rowcount
             return result, length
 
 
@@ -173,11 +173,31 @@ class DiscordAdapter:
 
 
 # ===========================================================
+# helpers
+# ===========================================================
+
+
+async def paging_message_content(repo: MessageRepository, size: int = 200):
+    page_size, offset = size, 0
+    length = -1
+
+    while length != 0:
+        messages, length = await repo.get_messages_content(limit=page_size, offset=offset)
+        offset += length
+        yield messages, length
+
+
+# ===========================================================
 # tests
 # ===========================================================
 import pytest
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(name="message_repo")
+def _message_repo():
+    return MessageRepository()
 
 
 class DiscordOptions(TypedDict):
@@ -196,6 +216,9 @@ def discord_test_options(request):
     return DiscordOptions(server_id=server_id, channel_id=channel_id)
 
 
+# ==========================================================================================
+
+
 async def test_sqlite_json():
     async with aiosqlite.connect(":memory:") as conn:
         await conn.execute("CREATE TABLE messages (id INTEGER PRIMARY KEY, data JSON)")
@@ -209,33 +232,26 @@ async def test_sqlite_json():
 
 
 @pytest.mark.target
-async def test_pagination_message_content():
-    repo = MessageRepository()
+async def test_pagination_message_content(message_repo: MessageRepository):
+    page_generator = paging_message_content(message_repo, 10)
+    message_content_page, page_length = await anext(page_generator)
 
-    async def paging_message_content(_repo: MessageRepository):
-        page_size, offset = 200, 0
-        length = -1
+    for msg in message_content_page:
+        logging.info(f"PAGINATION_TEST: Iterate over page, msg: {msg}")
 
-        while length != 0:
-            messages, length = await repo.get_messages_content(limit=page_size, offset=offset)
-            offset += length
-            yield messages
-
-    page_generator = await anext(paging_message_content(repo))
-
-    for msg in page_generator:
-        logging.info(f"Got <{msg[1]}> messages")
+    async for page, page_length in page_generator:
+        assert page_length != -1, f"page_length return -1, {page}"
+        logging.info(f"PAGINATION_TEST: Got page with {page_length} messages")
 
 
 @pytest.mark.pipeline
-async def test_discord_download_history(discord_opts: DiscordOptions):
+async def test_discord_download_history(discord_opts: DiscordOptions, message_repo: MessageRepository):
     config = Config()
-    message_repository = MessageRepository()
-    await message_repository.try_create_table()
-    discord = DiscordAdapter(repo=message_repository)
+    await message_repo.try_create_table()
+    discord = DiscordAdapter(repo=message_repo)
     messages = await discord.get_messages_per_day(
         discord_opts.get("channel_id"),
         headers={"Authorization": f"{config.discord_token}"},
     )
     assert messages, "Downloaded messages is None"
-    await message_repository.bulk_save(messages)
+    await message_repo.bulk_save(messages)
