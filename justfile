@@ -30,3 +30,8 @@ lint:
 
 infra_up:
   podman-compose -f compose/qdrant.compose.yaml up -d
+
+# ==========================================================================
+[working-directory: "test_user_bot"]
+discord_export_chat_history server_id channel_id:
+  bun index.ts --server {{ server_id }} --channel {{ channel_id }}

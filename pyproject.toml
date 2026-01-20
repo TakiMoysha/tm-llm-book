@@ -42,6 +42,7 @@ dependencies = [
   "openai-whisper>=20250625",
   "ffmpeg-python>=0.2.0",
   "pydub>=0.25.1",
+  "python-dateutil>=2.9.0.post0",
 ]
 
 [build-system]
