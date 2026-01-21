@@ -114,12 +114,12 @@ class MessageRepository:
         logging.info(f"Saved {saved}/{total} in {_end_time - _start_time:.2f} seconds. Failed chunks: {failed_chunks}")
 
     async def get_messages_content(self, limit: int = 200, offset: int = 0):
-        MessageContent = collections.namedtuple("MessageContent", ["content"])
-        SQL_SELECT_PAGE = "SELECT content FROM messages LIMIT ? OFFSET ?"
+        MessageContent = collections.namedtuple("MessageContent", ["id", "content"])
+        SQL_SELECT_PAGE = "SELECT id, content FROM messages LIMIT ? OFFSET ?"
 
         async with aiosqlite.connect(self._url) as conn:
             # issue with type check in aiosqlite, read as lambda fn
-            conn.row_factory = type("_", tuple(), {"__new__": lambda _, cursor, row: MessageContent(row[0])})
+            conn.row_factory = type("_", tuple(), {"__new__": lambda _, cursor, row: MessageContent(row[0], row[1])})
             msg_cur = await conn.execute(SQL_SELECT_PAGE, (limit, offset))
             result = await msg_cur.fetchall()
             result = cast(tuple[MessageContent], tuple([mc for mc in result]))

@@ -8,6 +8,7 @@ Implementation of summarization of large materials, I used hierarchical summariz
 """
 
 import logging
+import tiktoken
 from argparse import ArgumentParser
 from typing import cast
 
@@ -24,6 +25,8 @@ CONFIG__SEGMENT_OVERLAP = 500
 
 CONFIG__RECURSIVE_AGGREGATION_MAX_SIZE = 12000
 CONFIG__RECURSIVE_AGGREGATION_BLOCK_SIZE = 2
+
+TOKENIZER = tiktoken.get_encoding("cl100k_base")
 
 # ==========================================================================================
 import lmstudio as lms
@@ -101,8 +104,6 @@ Summaries:
 Final comprehensive summary:
 """)
 
-
-TOKENIZER = tiktoken.get_encoding("cl100k_base")
 
 
 def token_count(text: str) -> int:
