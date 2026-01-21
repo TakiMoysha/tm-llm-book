@@ -102,11 +102,11 @@ Final comprehensive summary:
 """)
 
 
-tokenizer = tiktoken.get_encoding("cl100k_base")
+TOKENIZER = tiktoken.get_encoding("cl100k_base")
 
 
 def token_count(text: str) -> int:
-    return len(tokenizer.encode(text))
+    return len(TOKENIZER.encode(text))
 
 
 def split_input(
@@ -202,7 +202,7 @@ def recursive_aggregate(
 
 
 def hierarchical_summarize_pipeline(input_text: str, **kwargs):
-    text_token_size = len(tokenizer.encode(input_text))
+    text_token_size = len(TOKENIZER.encode(input_text))
     logging.info(f"Input text token size: {text_token_size}")
 
     segments = segmentate(input_text)
