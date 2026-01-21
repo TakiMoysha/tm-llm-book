@@ -118,10 +118,12 @@ class MessageRepository:
         SQL_SELECT_PAGE = "SELECT content FROM messages LIMIT ? OFFSET ?"
 
         async with aiosqlite.connect(self._url) as conn:
+            # issue with type check in aiosqlite, read as lambda fn
             conn.row_factory = type("_", tuple(), {"__new__": lambda _, cursor, row: MessageContent(row[0])})
             msg_cur = await conn.execute(SQL_SELECT_PAGE, (limit, offset))
-            logging.info(f"Got page with {msg_cur.rowcount} messages")
-            result, length = cast(Iterable[MessageContent], await msg_cur.fetchall()), msg_cur.rowcount
+            result = await msg_cur.fetchall()
+            result = cast(tuple[MessageContent], tuple([mc for mc in result]))
+            length = len(result)
             return result, length
 
 
@@ -183,8 +185,12 @@ async def paging_message_content(repo: MessageRepository, size: int = 200):
 
     while length != 0:
         messages, length = await repo.get_messages_content(limit=page_size, offset=offset)
+        messages = tuple(messages)
+        length = len(messages)
         offset += length
-        yield messages, length
+        if length == 0:
+            break
+        yield  messages, length
 
 
 # ===========================================================
@@ -237,11 +243,11 @@ async def test_pagination_message_content(message_repo: MessageRepository):
     message_content_page, page_length = await anext(page_generator)
 
     for msg in message_content_page:
-        logging.info(f"PAGINATION_TEST: Iterate over page, msg: {msg}")
+        logging.debug(f"PAGINATION_TEST: Iterate over page, msg: {msg}")
 
     async for page, page_length in page_generator:
         assert page_length != -1, f"page_length return -1, {page}"
-        logging.info(f"PAGINATION_TEST: Got page with {page_length} messages")
+        logging.debug(f"PAGINATION_TEST: Got page with {page_length} messages: {page[0].content}...")
 
 
 @pytest.mark.pipeline
