@@ -237,7 +237,6 @@ async def test_sqlite_json():
         assert valid
 
 
-@pytest.mark.target
 async def test_pagination_message_content(message_repo: MessageRepository):
     page_generator = paging_message_content(message_repo, 10)
     message_content_page, page_length = await anext(page_generator)
