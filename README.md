@@ -1,5 +1,9 @@
 # Worklog
 
+## Coding Agents
+
+Agents for llm with providing patterns and architecture description.
+
 ## LangChain
 
 **LLM Adapters** - `langchain.llms.OpenAI`, `langchain.llms.HuggingFaceHub`, и т.д. Это адаптеры, которые отвечают за обрабатывание http запросов к API, сериализацию/десериализацию, управлением параметрами (температура, токены и т.д.).
